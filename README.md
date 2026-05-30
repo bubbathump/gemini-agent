@@ -1,13 +1,14 @@
-# Gemini CLI Agent
+# Gemini/OpenAI CLI Agent
 
-A standalone Python-based CLI agent that interacts with the Google Gemini API to perform various tasks.
+A standalone Python-based CLI agent that interacts with Google Gemini or OpenAI to perform various tasks.
 
 ## Features
+- **Multi-Provider**: Switch between Google Gemini and OpenAI.
 - **Summarize**: Get a concise summary of any text file.
 - **Generate**: Create content based on prompts and optionally save to a file.
 - **Ask**: Quick Q&A interface for general knowledge. Supports **@context** (files or directories).
 - **History**: Maintains a persistent record of all commands executed.
-- **Config**: Set and persist a default model.
+- **Config**: Set and persist default models and providers.
 
 ## Setup
 
@@ -16,11 +17,13 @@ A standalone Python-based CLI agent that interacts with the Google Gemini API to
    pip install -r requirements.txt
    ```
 
-2. **Configure API Key and Defaults**:
+2. **Configure API Keys and Defaults**:
    Create a `.env` file in the `agent/` directory:
    ```env
-   GEMINI_API_KEY=your_api_key_here
-   DEFAULT_MODEL=gemini-2.5-flash
+   PROVIDER=gemini
+   GEMINI_API_KEY=your_gemini_key
+   OPENAI_API_KEY=your_openai_key
+   DEFAULT_MODEL=gemini-2.0-flash
    ```
 
 ## Usage
@@ -36,22 +39,30 @@ A standalone Python-based CLI agent that interacts with the Google Gemini API to
   Run without arguments to enter a persistent session.
   ```bash
   python3 agent.py
+  agent> config set provider openai
   agent> ask "How are you?"
   agent> exit
   ```
 
-- **Piped Commands (Stdin)**:
+### Commands
+
+- **Switch Provider**:
   ```bash
-  echo "models" | python3 agent.py
-  cat commands.txt | python3 agent.py
+  python3 agent.py config set provider openai
+  python3 agent.py config set provider gemini
   ```
 
-### Commands
+- **List available models**:
+  ```bash
+  # Lists models for the active provider
+  python3 agent.py models
+  ```
 
 - **Ask about a file or directory**:
   ```bash
-  # Analyze a specific file
+  # Works with both Gemini and OpenAI
   python3 agent.py ask "Explain the logic in @agent.py"
+  ```
 
   # Analyze an entire directory
   python3 agent.py ask "Summarize the project structure in @src/"
