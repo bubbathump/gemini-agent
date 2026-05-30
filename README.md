@@ -25,6 +25,29 @@ A standalone Python-based CLI agent that interacts with the Google Gemini API to
 
 ## Usage
 
+### Interaction Modes
+
+- **One-shot Command**:
+  ```bash
+  python3 agent.py ask "Hello"
+  ```
+
+- **Interactive Mode (REPL)**:
+  Run without arguments to enter a persistent session.
+  ```bash
+  python3 agent.py
+  agent> ask "How are you?"
+  agent> exit
+  ```
+
+- **Piped Commands (Stdin)**:
+  ```bash
+  echo "models" | python3 agent.py
+  cat commands.txt | python3 agent.py
+  ```
+
+### Commands
+
 - **Ask about a file or directory**:
   ```bash
   # Analyze a specific file

@@ -1,11 +1,9 @@
-#!/home/chris/agent/venv/bin/python3
-#!/usr/bin/python3
-
 import argparse
 import json
 import os
 import sys
 import time
+import shlex
 from datetime import datetime
 from pathlib import Path
 try:
@@ -91,16 +89,8 @@ class GeminiClient:
         except Exception as e:
             return [f"Error listing models: {str(e)}"]
 
-def main():
-    # Load environment variables
-    if HAS_DEPS:
-        load_dotenv(ENV_FILE)
-    
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    history_mgr = HistoryManager(HISTORY_FILE)
-
-    parser = argparse.ArgumentParser(description="Gemini CLI Agent")
+def create_parser():
+    parser = argparse.ArgumentParser(description="Gemini CLI Agent", prog="agent")
     current_default = get_default_model()
     parser.add_argument("--model", type=str, default=current_default, help=f"Gemini model to use (default: {current_default})")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -130,12 +120,18 @@ def main():
     set_parser = config_subparsers.add_parser("set", help="Set a configuration value")
     set_parser.add_argument("key", choices=["model"], help="The configuration key to set")
     set_parser.add_argument("value", type=str, help="The value to set")
+    
+    # Exit command (for REPL)
+    subparsers.add_parser("exit", help="Exit the interactive agent")
 
-    args = parser.parse_args()
+    return parser
 
+def execute_command(args, api_key, history_mgr):
     if not args.command:
-        parser.print_help()
-        return
+        return True
+
+    if args.command == "exit":
+        return False
 
     try:
         client = None
@@ -143,12 +139,11 @@ def main():
             client = GeminiClient(api_key, model_name=args.model)
 
         if args.command == "summarize":
-            # ... (unchanged)
             file_path = Path(args.file)
             if not file_path.exists():
                 print(f"Error: File '{args.file}' not found.")
                 history_mgr.add_entry("summarize", [args.file], "failed")
-                return
+                return True
             
             content = file_path.read_text()
             prompt = f"Please provide a concise summary of the following content:\n\n{content}"
@@ -172,7 +167,6 @@ def main():
             context = ""
             referenced_paths = []
             
-            # Parse @file or @directory
             words = question.split()
             for word in words:
                 if word.startswith("@") and len(word) > 1:
@@ -198,7 +192,7 @@ def main():
                                     content = f.read_text()
                                     context += f"\n--- Content of {f} ---\n{content}\n"
                                     count += 1
-                                    if count >= 30:  # Safety limit
+                                    if count >= 30:
                                         context += f"\n... (Limit reached for {path_str}) ...\n"
                                         break
                                 except (UnicodeDecodeError, Exception):
@@ -232,7 +226,6 @@ def main():
             models = client.list_models()
             print("\n--- Available Gemini Models ---\n")
             for m in models:
-                # Cleaning up model name (stripping 'models/')
                 clean_name = m.replace("models/", "")
                 print(f"- {clean_name}")
             history_mgr.add_entry("models", [], "success")
@@ -240,7 +233,6 @@ def main():
         elif args.command == "config":
             if args.config_command == "set":
                 if args.key == "model":
-                    # Simple .env update logic
                     lines = []
                     if ENV_FILE.exists():
                         lines = ENV_FILE.read_text().splitlines()
@@ -265,6 +257,59 @@ def main():
         print(f"Critical Error: {str(e)}")
         if args.command:
             history_mgr.add_entry(args.command, [], "error")
+    
+    return True
+
+def main():
+    if HAS_DEPS:
+        load_dotenv(ENV_FILE)
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    history_mgr = HistoryManager(HISTORY_FILE)
+    parser = create_parser()
+
+    # One-shot mode
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+        execute_command(args, api_key, history_mgr)
+        return
+
+    # Stdin / Interactive mode
+    is_tty = sys.stdin.isatty()
+    if is_tty:
+        print("Gemini CLI Agent - Interactive Mode (type 'exit' to quit)")
+    
+    while True:
+        try:
+            if is_tty:
+                line = input("agent> ")
+            else:
+                line = sys.stdin.readline()
+                if not line:
+                    break
+            
+            line = line.strip()
+            if not line:
+                continue
+            
+            # shlex.split handles quotes correctly
+            cmd_args = shlex.split(line)
+            
+            # argparse might call sys.exit() on error or --help, we need to catch it
+            try:
+                args = parser.parse_args(cmd_args)
+                if not execute_command(args, api_key, history_mgr):
+                    break
+            except SystemExit:
+                # argparse already printed the error/help
+                continue
+                
+        except (EOFError, KeyboardInterrupt):
+            if is_tty:
+                print("\nExiting...")
+            break
+        except Exception as e:
+            print(f"Error processing input: {e}")
 
 if __name__ == "__main__":
     main()
