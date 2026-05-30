@@ -75,6 +75,13 @@ A standalone Python-based CLI agent that interacts with the Google Gemini API to
 - **View history**:
   ```bash
   python3 agent.py history
+  # or explicitly
+  python3 agent.py history list
+  ```
+
+- **Reset history**:
+  ```bash
+  python3 agent.py history reset
   ```
 
 - **List available models**:

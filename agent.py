@@ -40,6 +40,9 @@ class HistoryManager:
         with open(self.file_path, "w") as f:
             json.dump(history, f, indent=4)
 
+    def clear_history(self):
+        self.save_history([])
+
     def add_entry(self, command: str, args: list, status: str = "success"):
         history = self.load_history()
         entry = {
@@ -109,7 +112,10 @@ def create_parser():
     ask_parser.add_argument("question", type=str, help="The question to ask")
 
     # History command
-    subparsers.add_parser("history", help="Show command history")
+    history_parser = subparsers.add_parser("history", help="Show or reset command history")
+    history_subparsers = history_parser.add_subparsers(dest="history_command", help="History subcommands")
+    history_subparsers.add_parser("list", help="List command history (default)")
+    history_subparsers.add_parser("reset", help="Clear all command history")
 
     # Models command
     subparsers.add_parser("models", help="List available Gemini models")
@@ -209,18 +215,23 @@ def execute_command(args, api_key, history_mgr):
             history_mgr.add_entry("ask", [question] + referenced_paths, "success")
 
         elif args.command == "history":
-            history = history_mgr.load_history()
-            if not history:
-                print("No history found.")
+            if args.history_command == "reset":
+                history_mgr.clear_history()
+                print("History has been reset.")
             else:
-                print(f"{'Timestamp':<25} | {'Command':<10} | {'Status':<8} | {'Arguments'}")
-                print("-" * 80)
-                for entry in history:
-                    ts = entry['timestamp'][:19].replace('T', ' ')
-                    cmd = entry['command']
-                    status = entry['status']
-                    args_str = ", ".join([str(a) for a in entry['arguments'] if a is not None])
-                    print(f"{ts:<25} | {cmd:<10} | {status:<8} | {args_str}")
+                # Default to listing history
+                history = history_mgr.load_history()
+                if not history:
+                    print("No history found.")
+                else:
+                    print(f"{'Timestamp':<25} | {'Command':<10} | {'Status':<8} | {'Arguments'}")
+                    print("-" * 80)
+                    for entry in history:
+                        ts = entry['timestamp'][:19].replace('T', ' ')
+                        cmd = entry['command']
+                        status = entry['status']
+                        args_str = ", ".join([str(a) for a in entry['arguments'] if a is not None])
+                        print(f"{ts:<25} | {cmd:<10} | {status:<8} | {args_str}")
 
         elif args.command == "models":
             models = client.list_models()
